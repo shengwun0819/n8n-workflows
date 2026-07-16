@@ -1,0 +1,530 @@
+{
+  "name": "sentry report",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "weeks",
+              "triggerAtDay": [
+                1
+              ],
+              "triggerAtHour": 9
+            }
+          ]
+        }
+      },
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.3,
+      "position": [
+        -96,
+        0
+      ],
+      "id": "69fee509-bf98-4648-94d4-7dea7b67e111",
+      "name": "Schedule Trigger"
+    },
+    {
+      "parameters": {
+        "url": "https://sentry.io/api/0/projects/your-org-slug/your-project-slug/issues/",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendQuery": true,
+        "queryParameters": {
+          "parameters": [
+            {
+              "name": "query",
+              "value": "=is:unresolved !message:\"GQL\""
+            },
+            {
+              "name": "limit",
+              "value": "100"
+            },
+            {
+              "name": "sort",
+              "value": "freq"
+            },
+            {
+              "name": "start",
+              "value": "={{ $now.minus({days: 7}).toISO() }}"
+            },
+            {
+              "name": "end",
+              "value": "={{ $now.toISO() }}"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        256,
+        0
+      ],
+      "id": "7671498d-0a85-46a2-907f-d7e49e09bfa8",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "sdjBpB9kQNta5r3k",
+          "name": "Header Auth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ JSON.stringify($json.data) }}",
+        "options": {
+          "systemMessage": "你是 Sentry 週報分析師。報告使用 Slack mrkdwn 格式（不用 Markdown、不用表格），總字數 500 字以內。\n\n## 分類規則\n- 🌐 Network：Network Error、AxiosError、HTTP 5xx、timeout\n- 🔵 BLE：executeAPDU、Characteristic not found、BluetoothLE\n- ⚙️ Firmware：updateSE、updateFirmware、Load Script Failed\n- 💰 交易：broadcastTransaction、SIGERROR、Illegal Fee、invalid mnemonic\n- ⏸️ App Hang：App Hang、App Hanging\n- 🛡️ 系統：permission、Keystore、Biometric\n- ❓ 其他\n\n## 輸出結構\n*📊 Sentry 週報*\n*摘要*：總 Issues / Events / Users\n*🔴 Top 10*：依 events 排序，含 🆕🔄✅ 狀態標示\n*📂 類別分布*：各類 issues 數與 events 總計\n*💡 建議*：3 個優先處理項目與原因\n\n## Google Sheets Tool\n- 先呼叫 Tool 讀取上週資料，對比 issue_id：\n🆕 新增 / 🔄 持續 / ✅ 改善（上週有本週無）\n- 呼叫 Google Sheets Tool 時不需要詢問使用者，直接呼叫即可，Tool 已設定好自動讀取上週資料。"
+        }
+      },
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        1008,
+        0
+      ],
+      "id": "dfd1eb5f-345e-4276-bebb-49810674c63a",
+      "name": "AI Agent"
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "value": "claude-haiku-4-5-20251001",
+          "mode": "list",
+          "cachedResultName": "Claude Haiku 4.5"
+        },
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.lmChatAnthropic",
+      "typeVersion": 1.5,
+      "position": [
+        928,
+        272
+      ],
+      "id": "d3d0dd74-7d00-4dac-b776-18270fad81b0",
+      "name": "Anthropic Chat Model",
+      "credentials": {
+        "anthropicApi": {
+          "id": "v4Yy4HibcS2CRxfF",
+          "name": "Anthropic account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        416,
+        0
+      ],
+      "id": "ad1d6b84-7724-409a-b9ca-09f5718cc941",
+      "name": "Aggregate"
+    },
+    {
+      "parameters": {
+        "jsCode": "const issues = $input.first().json.data;\nconst runDate = new Date().toISOString().split('T')[0];\n\nconst slimmed = issues.slice(0, 40).map(issue => ({\n  run_date: runDate,\n  issue_id: issue.shortId,\n  title: issue.title,\n  events: issue.count,\n  users: issue.userCount,\n  first_seen: issue.firstSeen,\n  last_seen: issue.lastSeen\n}));\n\nreturn slimmed.map(item => ({ json: item }));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        624,
+        0
+      ],
+      "id": "69e6739a-5299-4855-a048-dac4c3bf4580",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "mode": "name",
+          "value": "#your-slack-channel"
+        },
+        "text": "={{ $json.output }}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        1296,
+        0
+      ],
+      "id": "21168a54-fe44-441e-ae54-5f7c4926338f",
+      "name": "Send a message",
+      "webhookId": "5c843bf2-6e24-4a28-b326-69c8b0275fa1",
+      "credentials": {
+        "slackApi": {
+          "id": "iYPlwGD048ttYtLO",
+          "name": "Slack account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus",
+          "mode": "list",
+          "cachedResultName": "sentry report history",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $('Create sheet').first().json.title }}",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "run_date",
+              "displayName": "run_date",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "issue_id",
+              "displayName": "issue_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "title",
+              "displayName": "title",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "events",
+              "displayName": "events",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "users",
+              "displayName": "users",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "first_seen",
+              "displayName": "first_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "last_seen",
+              "displayName": "last_seen",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        832,
+        -160
+      ],
+      "id": "ab810d49-f578-4cac-b739-d2a0e7d119b9",
+      "name": "Append row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "XCT9IJ80MDdjaqWm",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "create",
+        "documentId": {
+          "__rl": true,
+          "value": "1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus",
+          "mode": "list",
+          "cachedResultName": "sentry report history",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus/edit?usp=drivesdk"
+        },
+        "title": "={{ $now.format('yyyy-MM-dd') }}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        80,
+        0
+      ],
+      "id": "e4e9360e-93a6-4e5f-8dd3-47611c6a5812",
+      "name": "Create sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "XCT9IJ80MDdjaqWm",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "aggregate": "aggregateAllItemData",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.aggregate",
+      "typeVersion": 1,
+      "position": [
+        832,
+        0
+      ],
+      "id": "7b37d484-7eec-485e-b43b-45f65c05101e",
+      "name": "Aggregate1"
+    },
+    {
+      "parameters": {
+        "descriptionType": "manual",
+        "toolDescription": "讀取上週 Sentry issue 紀錄。輸入上週日期（格式：yyyy-MM-dd），回傳所有 issue_id 清單，用於與本週比對 new vs ongoing。",
+        "documentId": {
+          "__rl": true,
+          "value": "1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus",
+          "mode": "list",
+          "cachedResultName": "sentry report history",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "={{ $now.minus({days: 7}).format('yyyy-MM-dd') }}",
+          "mode": "name"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTool",
+      "typeVersion": 4.7,
+      "position": [
+        1264,
+        272
+      ],
+      "id": "debd673b-3dfc-4c36-b219-e7918c3e1fb2",
+      "name": "Get row(s) in sheet in Google Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "XCT9IJ80MDdjaqWm",
+          "name": "Google Sheets account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "content": "### 優化方向\n1. 互動式 Sentry 查詢 bot: 可以在Slack 問問題、AI 回答、追問細節",
+        "color": 4
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "position": [
+        1040,
+        -336
+      ],
+      "typeVersion": 1,
+      "id": "cad8a26c-7d44-47c2-a9b8-76fc6310eac1",
+      "name": "Sticky Note"
+    },
+    {
+      "parameters": {
+        "content": "---\n# 🔍 Sentry 週報自動化 Workflow\n\n## 概述\n每週一早上 9:00（台北時間）自動執行，\n撈取過去 7 天 Sentry unresolved errors，\n經 Claude AI 分析後發送摘要至 Slack #your-slack-channel，\n並將原始資料儲存至 Google Sheets 供歷史對比使用。\n\n---\n\n## 節點說明\n\n### 1. Schedule Trigger\n- 觸發時間：每週一 01:00 UTC（= 台北時間 09:00）\n- 每次觸發啟動整個 workflow\n\n### 2. Create sheet\n- 在 Google Sheets「sentry report history」內\n  建立以當次執行時間命名的分頁（格式：yyyy-MM-dd HH:mm:ss）\n- 必須是第一個節點，確保後續節點能正確引用分頁名稱\n\n### 3. HTTP Request\n- 呼叫 Sentry REST API\n- Organization: your-org-slug\n- Project ID: your-project-id\n- 查詢條件: is:unresolved level:error !message:\"GQL\"\n- 時間範圍: 過去 7 天\n- 排序: 依頻率（freq）\n- 回傳上限: 100 個 issues\n\n### 4. Aggregate\n- 將 HTTP Request 回傳的 100 個 items\n  合併為 1 個 item，供後續節點處理\n\n### 5. Code in JavaScript\n- 從 100 個 issues 中取 Top 40（頻率最高）\n- 精簡欄位：run_date, issue_id, title,\n  events, users, first_seen, last_seen\n- 輸出 40 個獨立 item\n\n⚠️ slice(0, 40) 的原因：\n個人 Anthropic API 帳號有 10,000 TPM 限制，\n100 個 issues 超過上限會報錯。\n升級 API 方案後可改為 slice(0, 100)。\n\n### 6. Append row in sheet\n- 將 40 個 issues 逐行寫入當週 Google Sheets\n- 第一次寫入時自動建立 header row\n\n### 7. Aggregate1\n- 將 40 個 items 重新合併為 1 個\n  供 AI Agent 做單次分析（避免 rate limit）\n\n### 8. AI Agent（Claude Haiku 4.5）\n- 讀取本週 40 個 issues 進行分類分析\n- 透過 Google Sheets Tool 讀取上週資料\n  做 🆕新增 / 🔄持續 / ✅改善 的對比\n- 輸出 Slack 格式報告\n\n### 9. Send a message（Slack）\n- 將 AI 分析報告發送至 #your-slack-channel\n\n---\n\n## 資料流\n\nSchedule Trigger\n  → Create sheet（建立當週分頁）\n  → HTTP Request（撈 Sentry 100 issues）\n  → Aggregate（合併）\n  → Code（取 Top 40，精簡欄位）\n  ├→ Append row（存入 Google Sheets）\n  └→ Aggregate1 → AI Agent → Slack\n\n---\n\n## 相關資源\n- Sentry: https://your-org.sentry.io\n- Google Sheets: sentry report history\n- Slack: #your-slack-channel\n- Anthropic API: claude-haiku-4-5-20251001",
+        "height": 2112,
+        "width": 560
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        -1056
+      ],
+      "id": "d46d15df-5a52-47fc-849d-d9e038ab65dd",
+      "name": "Sticky Note1"
+    },
+    {
+      "parameters": {
+        "content": "Step 1 — 在 Create sheet 後加入 Set 節點\n\n- 加入 Edit Fields (Set) 節點\n- 加一個欄位：\n  - Name: period_days\n  - Value: 7（要跑 14D 時改成 14）\n\nStep 2 — 更新 HTTP Request 的 start 參數\n\n{{ $now.minus({days: $('Edit Fields').first().json.period_days}).toISO() }}\n\nStep 3 — 更新 Create sheet 的 Title\n\n{{ $now.format('yyyy-MM-dd HH:mm:ss') }} ({{ $('Edit Fields').first().json.period_days }}D)\n\n這樣分頁名稱會是 2026-07-16 09:00:00 (7D) 或 (14D)，一眼就知道這份報告的時間範圍。\n\nStep 4 — 更新 AI Agent 的 System Message\n\n在分析說明加入：\n查詢時間範圍：過去 {{ $('Edit Fields').first().json.period_days }} 天",
+        "height": 512,
+        "width": 576,
+        "color": 3
+      },
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        -48,
+        192
+      ],
+      "id": "dd99c02f-8054-4dd3-8cf0-e475386b000a",
+      "name": "Sticky Note2"
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "Create sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "Aggregate",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Anthropic Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Append row in sheet",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Aggregate1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "AI Agent": {
+      "main": [
+        [
+          {
+            "node": "Send a message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create sheet": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aggregate1": {
+      "main": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get row(s) in sheet in Google Sheets": {
+      "ai_tool": [
+        [
+          {
+            "node": "AI Agent",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "9153cd05-fed9-4b2b-b944-de72b3b712d5",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a5787cff42a8a06dff9f65b8ec885562aa51c5e354fa84b20873140871faab76"
+  },
+  "nodeGroups": [],
+  "id": "N7QI4TwOmQa1D7H5",
+  "tags": [
+    {
+      "name": "sentry",
+      "id": "IiSWZgqQtn8BntnV",
+      "updatedAt": "2026-07-15T09:07:55.090Z",
+      "createdAt": "2026-07-15T09:07:55.090Z"
+    }
+  ]
+}
