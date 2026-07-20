@@ -159,21 +159,3 @@ limit: 100
 | users | 影響用戶數 |
 | first_seen | 首次出現時間 |
 | last_seen | 最後出現時間 |
-
----
-
-## 版本紀錄
-
-| 版本 | 說明 |
-|------|------|
-| v1.0 | 初始版本：Sentry → Claude → Slack |
-| v1.1 | 加入 Google Sheets 歷史紀錄 + 上週對比 |
-| v1.2 | 加入 Workflow README（Sticky Note） |
-| v1.3 | 精簡 System Message、調整 issues 數量至 40 |
-| v1.4 | Top 10 高頻 Issues |
-| v1.5 | 移除 level 限制，涵蓋所有 severity |
-| v1.6 | 修正時區問題：Schedule 改為 Sunday 21:00 NY（= 台北週一 09:00）；Create sheet 與 Get rows 日期計算改用 Asia/Taipei 時區，避免 server 時區造成的分頁找不到問題 |
-| v1.7 | 加入 events 週變化趨勢：🔄 持續 issues 顯示 ↑X% / ↓X% 週變化率；新增「本週改善」區段（✅ 上週有本週消失的 issues）；字數上限調整至 650 |
-| v1.8 | 優化 Sentry 查詢排除條件：過濾 App Loaded、successfully、Success 等成功日誌，避免非 error 事件稀釋真實異常訊號 |
-| v1.9 | 新增 `level:error` 過濾 info/warning 等級（排除如 updateFirmware is called 等日誌）；新增 `!message:"Network Error"` 排除泛型網路錯誤 |
-| v1.10 | Slack 訊息底部新增 Sentry Issue Page 與 Google Sheet 超連結；啟用 Use Markdown? 確保 mrkdwn 正確 render |
