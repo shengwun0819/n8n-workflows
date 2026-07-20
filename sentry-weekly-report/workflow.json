@@ -8,9 +8,9 @@
             {
               "field": "weeks",
               "triggerAtDay": [
-                1
+                0
               ],
-              "triggerAtHour": 9
+              "triggerAtHour": 21
             }
           ]
         }
@@ -34,7 +34,7 @@
           "parameters": [
             {
               "name": "query",
-              "value": "=is:unresolved !message:\"GQL\""
+              "value": "=is:unresolved level:error !message:\"GQL\" !message:\"App Loaded\" !message:\"successfully\" !message:\"Success\" !message:\"Network Error\""
             },
             {
               "name": "limit",
@@ -76,7 +76,7 @@
         "promptType": "define",
         "text": "={{ JSON.stringify($json.data) }}",
         "options": {
-          "systemMessage": "你是 Sentry 週報分析師。報告使用 Slack mrkdwn 格式（不用 Markdown、不用表格），總字數 500 字以內。\n\n## 分類規則\n- 🌐 Network：Network Error、AxiosError、HTTP 5xx、timeout\n- 🔵 BLE：executeAPDU、Characteristic not found、BluetoothLE\n- ⚙️ Firmware：updateSE、updateFirmware、Load Script Failed\n- 💰 交易：broadcastTransaction、SIGERROR、Illegal Fee、invalid mnemonic\n- ⏸️ App Hang：App Hang、App Hanging\n- 🛡️ 系統：permission、Keystore、Biometric\n- ❓ 其他\n\n## 輸出結構\n*📊 Sentry 週報*\n*摘要*：總 Issues / Events / Users\n*🔴 Top 10*：依 events 排序，含 🆕🔄✅ 狀態標示\n*📂 類別分布*：各類 issues 數與 events 總計\n*💡 建議*：3 個優先處理項目與原因\n\n## Google Sheets Tool\n- 先呼叫 Tool 讀取上週資料，對比 issue_id：\n🆕 新增 / 🔄 持續 / ✅ 改善（上週有本週無）\n- 呼叫 Google Sheets Tool 時不需要詢問使用者，直接呼叫即可，Tool 已設定好自動讀取上週資料。"
+          "systemMessage": "你是 Sentry 週報分析師。報告使用 Slack mrkdwn 格式（不用 Markdown、不用表格），總字數 650 字以內。\n\n## 分類規則\n- 🌐 Network：Network Error、AxiosError、HTTP 5xx、timeout\n- 🔵 BLE：executeAPDU、Characteristic not found、BluetoothLE\n- ⚙️ Firmware：updateSE、updateFirmware、Load Script Failed\n- 💰 交易：broadcastTransaction、SIGERROR、Illegal Fee、invalid mnemonic\n- ⏸️ App Hang：App Hang、App Hanging\n- 🛡️ 系統：permission、Keystore、Biometric\n- ❓ 其他\n\n## 執行步驟（依序）\n1. 先呼叫 Google Sheets Tool 取得上週資料（欄位：issue_id、events、users）\n2. 建立上週 issue_id → {events, users} 對照表\n3. 對比本週與上週，分類每個 issue：\n   - 🆕 本週有、上週無\n   - 🔄 兩週都有\n   - ✅ 上週有、本週無\n4. 對每個 🔄 issue 計算 events 週變化率：\n   變化率 = (本週 events - 上週 events) / 上週 events × 100%\n   - 上升顯示 ↑X%（紅色警示）\n   - 下降顯示 ↓X%（改善）\n   - 上週 events 為 0 時略過趨勢\n\n## 輸出結構\n*📊 {your-app} Sentry 週報 (執行日期)*\n\n*摘要*：總 X Issues / X Events / X Users｜🆕 X 新增 / 🔄 X 持續 / ✅ X 改善\n\n*🔴 Top 10 Issues*（依 events 排序）\n每行格式：[狀態] `ISSUE-ID` title (Events: X ↑/↓X% | Users: X) [類別]\n🆕 issue 不顯示趨勢\n\n*📂 類別分布*：各類 issues 數與 events 總計\n\n*✅ 本週改善*：上週 Top 40 中本週消失的 issues（若無請略過此段）\n\n*💡 建議*：3 個優先處理項目與原因\n\n## 注意\n- Google Sheets Tool 直接呼叫，不需詢問使用者\n- events 數字超過 1000 以 K 表示、超過 100 萬以 M 表示"
         }
       },
       "type": "@n8n/n8n-nodes-langchain.agent",
@@ -148,8 +148,10 @@
           "mode": "name",
           "value": "#your-slack-channel"
         },
-        "text": "={{ $json.output }}",
-        "otherOptions": {}
+        "text": "={{ $json.output }}\n\n🔗 可參考 Sentry Issue Page: <https://your-org.sentry.io/issues/views/YOUR_VIEW_ID/?project=YOUR_PROJECT_ID&query=is%3Aunresolved%20level%3Aerror%20%21message%3A%22GQL%22%20%21message%3A%22App%20Loaded%22%20%21message%3A%22successfully%22%20%21message%3A%22Success%22%20%21message%3A%22Network%20Error%22&sort=freq&statsPeriod=7d|Sentry Weekly Report>\n📊 結果已統整至 Google Sheet: <https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit|Sentry Report History>",
+        "otherOptions": {
+          "mrkdwn": true
+        }
       },
       "type": "n8n-nodes-base.slack",
       "typeVersion": 2.5,
@@ -172,10 +174,10 @@
         "operation": "append",
         "documentId": {
           "__rl": true,
-          "value": "1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus",
+          "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "list",
           "cachedResultName": "sentry report history",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
         },
         "sheetName": {
           "__rl": true,
@@ -283,12 +285,12 @@
         "operation": "create",
         "documentId": {
           "__rl": true,
-          "value": "1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus",
+          "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "list",
           "cachedResultName": "sentry report history",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
         },
-        "title": "={{ $now.format('yyyy-MM-dd') }}",
+        "title": "={{ $now.setZone('Asia/Taipei').format('yyyy-MM-dd') }}",
         "options": {}
       },
       "type": "n8n-nodes-base.googleSheets",
@@ -326,14 +328,14 @@
         "toolDescription": "讀取上週 Sentry issue 紀錄。輸入上週日期（格式：yyyy-MM-dd），回傳所有 issue_id 清單，用於與本週比對 new vs ongoing。",
         "documentId": {
           "__rl": true,
-          "value": "1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus",
+          "value": "YOUR_GOOGLE_SHEET_ID",
           "mode": "list",
           "cachedResultName": "sentry report history",
-          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1xdb7zvuRKPhNsGj76x8aSi7X1n-adUJzniTMao2RMus/edit?usp=drivesdk"
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/YOUR_GOOGLE_SHEET_ID/edit?usp=drivesdk"
         },
         "sheetName": {
           "__rl": true,
-          "value": "={{ $now.minus({days: 7}).format('yyyy-MM-dd') }}",
+          "value": "={{ $now.minus({days: 7}).setZone('Asia/Taipei').format('yyyy-MM-dd') }}",
           "mode": "name"
         },
         "options": {}
@@ -515,7 +517,7 @@
   "versionId": "9153cd05-fed9-4b2b-b944-de72b3b712d5",
   "meta": {
     "templateCredsSetupCompleted": true,
-    "instanceId": "a5787cff42a8a06dff9f65b8ec885562aa51c5e354fa84b20873140871faab76"
+    "instanceId": ""
   },
   "nodeGroups": [],
   "id": "N7QI4TwOmQa1D7H5",
