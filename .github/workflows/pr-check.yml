@@ -1,0 +1,104 @@
+name: PR Check
+
+on:
+  pull_request:
+    branches: [main]
+
+jobs:
+  json-validity:
+    name: "① JSON Validity"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate all workflow.json files
+        run: |
+          FAILED=0
+          for f in $(find . -name "workflow.json"); do
+            echo "Checking $f..."
+            if jq empty "$f" 2>/dev/null; then
+              echo "✅ $f"
+            else
+              echo "❌ Invalid JSON: $f"
+              FAILED=1
+            fi
+          done
+          exit $FAILED
+
+  sensitive-info:
+    name: "② Sensitive Info Scan"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check for company-specific strings
+        run: |
+          FAILED=0
+          for f in $(find . -name "workflow.json"); do
+            if grep -qi "coolbitx" "$f"; then
+              echo "❌ Company name found in $f:"
+              grep -ni "coolbitx" "$f"
+              FAILED=1
+            else
+              echo "✅ No company name in $f"
+            fi
+          done
+          exit $FAILED
+
+      - name: Check for non-empty instanceId
+        run: |
+          FAILED=0
+          for f in $(find . -name "workflow.json"); do
+            INSTANCE_ID=$(jq -r '.instanceId // ""' "$f")
+            if [ -n "$INSTANCE_ID" ]; then
+              echo "❌ Non-empty instanceId found in $f"
+              FAILED=1
+            else
+              echo "✅ instanceId is empty in $f"
+            fi
+          done
+          exit $FAILED
+
+      - name: Check for real Google Sheets IDs
+        run: |
+          FAILED=0
+          for f in $(find . -name "workflow.json"); do
+            IDS=$(grep -oP '(?<=/spreadsheets/d/)[A-Za-z0-9_-]+' "$f" || true)
+            for id in $IDS; do
+              if [ "$id" != "YOUR_GOOGLE_SHEET_ID" ]; then
+                echo "❌ Real Google Sheets ID found in $f: $id"
+                FAILED=1
+              fi
+            done
+          done
+          [ $FAILED -eq 0 ] && echo "✅ No real Sheets IDs found"
+          exit $FAILED
+
+  placeholder-check:
+    name: "③ Placeholder Integrity"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check sentry-weekly-report placeholders
+        run: |
+          WF="sentry-weekly-report/workflow.json"
+          FAILED=0
+
+          check() {
+            if grep -q "$1" "$WF"; then
+              echo "✅ Found: '$1'"
+            else
+              echo "❌ Missing placeholder: '$1'"
+              FAILED=1
+            fi
+          }
+
+          check "your-org-slug"
+          check "your-project-slug"
+          check "YOUR_GOOGLE_SHEET_ID"
+          check "your-slack-channel"
+          check "YOUR_VIEW_ID"
+          check "YOUR_PROJECT_ID"
+
+          exit $FAILED
