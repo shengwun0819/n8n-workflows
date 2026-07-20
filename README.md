@@ -9,7 +9,8 @@
 
 | 資料夾 | 說明 | 觸發方式 | 整合服務 | 狀態 |
 |--------|------|----------|----------|------|
-| [sentry-weekly-report](./sentry-weekly-report/) | Sentry 每週 Error 分析，AI 分類後發送 Slack 週報 | 排程（週一 09:00） | Sentry / Claude / Google Sheets / Slack | ✅ 上線中 |
+| [sentry-weekly-report](./sentry-weekly-report/) | Sentry 每週 Error 分析，AI 分類後發送 Slack 週報 | 排程（週一 09:00） | Sentry / AI / Google Sheets / Slack | ✅ 上線中 |
+| [sentry-release-report](./sentry-release-report/) | 發版品質報告，自動比較新舊版 issues 差異並給出 🟢🟡🔴 評分 | 排程（每日 09:00） | Sentry / AI / Google Sheets / Slack | 🚧 開發中 |
 
 ---
 
@@ -18,7 +19,7 @@
 以下為多數 workflow 共用的服務，建議提前準備：
 
 - **n8n**：Self-hosted 或 n8n Cloud
-- **Anthropic API Key**：[console.anthropic.com](https://console.anthropic.com)
+- **AI Model API Key**：Anthropic（[console.anthropic.com](https://console.anthropic.com)）或 Google Gemini（[aistudio.google.com](https://aistudio.google.com)）
 - **Slack Bot Token**：[api.slack.com/apps](https://api.slack.com/apps)
 - **Google Sheets OAuth2**：[Google Cloud Console](https://console.cloud.google.com)
 
